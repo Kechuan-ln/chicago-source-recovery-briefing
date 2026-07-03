@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>目标数据很少时，另一个出行源能不能把城市流向补回来？</title>
+  <title>城市的"人流地图"缺了一大块，能用别的交通数据补回来吗？</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="#problem" class="brand">跨源流向恢复 · NYC + Chicago</a>
+    <a href="#problem" class="brand">补全城市人流地图 · 一页读懂</a>
     <nav aria-label="页面导航">
+      <a href="#story">来龙去脉</a>
       <a href="#data">数据</a>
       <a href="#nyc">纽约验证</a>
       <a href="#model">模型</a>
@@ -21,15 +22,15 @@
   <main>
     <section class="hero" id="problem">
       <div class="hero-copy reveal">
-        <p class="eyebrow">NYC 已验证 · Chicago 已复现 · PKU GPU 结果</p>
-        <h1>目标数据很少时，另一个出行源能不能把城市流向补回来？</h1>
-        <p class="lead">我们要恢复的不是"某个区域总共有多少人出行"，而是更细的"从哪个区域到哪个区域"。这条路在纽约已经走通一次：0.23% 的目标标签 + 一个神经翻译器，把误差砍掉一半以上；芝加哥的 47 方法基准进一步回答"什么时候该信参考源"。</p>
+        <p class="eyebrow">一页读懂我们的研究 · 城市出行数据</p>
+        <h1>城市的"人流地图"缺了一大块，能用别的交通数据补回来吗？</h1>
+        <p class="lead">修地铁、投共享单车、办大型活动，都要靠同一张图："每天有多少人、从哪个街区到哪个街区"。可惜这张图经常是缺的。我们的研究回答一件事：数据丰富的交通方式（比如出租车），能不能替数据稀缺的交通方式（比如共享单车）把这张图补出来——以及什么时候能信这种"借用"，什么时候不能。</p>
         <div class="hero-actions">
-          <a href="#nyc" class="primary-link">看纽约怎么成功的</a>
-          <a href="#results" class="secondary-link">看芝加哥对比结果</a>
+          <a href="#story" class="primary-link">先看来龙去脉</a>
+          <a href="#results" class="secondary-link">直接看结论</a>
         </div>
       </div>
-      <div class="hero-visual reveal" aria-label="Chicago OD 流向地图">
+      <div class="hero-visual reveal" aria-label="芝加哥人流地图">
         <div class="source-tabs" data-map-tabs></div>
         <div id="hero-map" class="map-frame"></div>
       </div>
@@ -37,142 +38,190 @@
 
     <section class="metric-band" aria-label="核心数字">
       <div>
-        <span class="metric-value">0.777 → 0.351</span>
-        <span class="metric-label">NYC raw WAPE，-54.8%（bike→taxi，0.23% 标签）</span>
+        <span class="metric-value">77.7% → 35.1%</span>
+        <span class="metric-label">纽约实验的平均误差：只靠 0.23% 的真实记录，误差砍掉一半以上</span>
       </div>
       <div>
         <span class="metric-value">78.0%</span>
-        <span class="metric-label">Chicago Taxi/TNC 跨源胜出率（1040 评测格）</span>
+        <span class="metric-label">芝加哥"同类互借"赛场上，借用打败不借用的比例（1040 个考题）</span>
       </div>
       <div>
         <span class="metric-value">47</span>
-        <span class="metric-label">同场对比方法数（含 15 个深度网络变体）</span>
+        <span class="metric-label">同场竞技的方法数量，其中 15 个是深度神经网络</span>
       </div>
       <div>
-        <span class="metric-value">98.75%</span>
-        <span class="metric-label">走廊重合度 CPC 指标上的胜率（Taxi/TNC）</span>
+        <span class="metric-value">千分之二</span>
+        <span class="metric-label">让"借用"从不可能变成可能的最小校准数据用量（数量级）</span>
       </div>
     </section>
 
-    <section class="section" id="data">
-      <div class="section-kicker">输入数据长什么样</div>
+    <section class="section" id="story">
+      <div class="section-kicker">来龙去脉</div>
+      <h2 class="reveal">一张表，交通规划界画了七十年。</h2>
+      <p class="section-lead reveal">要理解我们在做什么，只需要认识一张表：行是出发街区，列是到达街区，格子里是人数。它的专业名字叫 OD 表（Origin–Destination，起点–终点），<strong>下文我们统一叫它"流向表"</strong>。这张表怎么来，是一部七十年的技术史。</p>
+      <div class="timeline">
+        <article class="reveal">
+          <span class="era">1950 年代起</span>
+          <h3>问卷时代</h3>
+          <p>规划师挨家挨户发问卷："您今天从哪出发、去了哪、怎么去的？"一次全市调查花几年、花巨资，做完就过时，只能几年更新一次。</p>
+        </article>
+        <article class="reveal">
+          <span class="era">同一时期</span>
+          <h3>公式猜测</h3>
+          <p>数据太贵，就用公式猜。最有名的"重力模型"直接类比牛顿引力：两个区域人越多、离得越近，往来就越多。能猜出轮廓，猜不准细节。</p>
+        </article>
+        <article class="reveal">
+          <span class="era">2000 年代起</span>
+          <h3>大数据时代</h3>
+          <p>手机连基站的记录、GPS、公交刷卡，让出行被"顺带记录"下来。有数据的交通方式，第一次可以直接算出自己的流向表，不用再问、不用再猜。</p>
+        </article>
+        <article class="reveal">
+          <span class="era">现在</span>
+          <h3>数据孤岛</h3>
+          <p>但"有数据"成了奢侈品：共享单车、网约车各管各的；隐私法规越来越严。很多方式只公布"每个区进出多少人"的粗统计——"从哪到哪"被抹掉了。</p>
+        </article>
+      </div>
+      <div class="turning-point reveal">
+        <h3>一个自然的想法，和我们撞过的墙</h3>
+        <p>同一座城市里，出租车和共享单车载的是同一群人、跑的是同一张路网。那能不能<strong>拿数据多的方式，去补数据少的方式</strong>？这个想法很多团队（包括我们）都试过，也都碰过壁。我们在纽约、芝加哥的公开数据上系统地测过：如果缺数据的一方<strong>连一条</strong>真实的"从哪到哪"记录都没有，那不管用简单公式还是深度学习，都赢不过"只看进出总量"的笨办法——信息不够，模型再聪明也无中生有不了。我们把这个实测出来的极限叫<strong>信息天花板</strong>。</p>
+        <p>本研究的核心发现是一个转折：<strong>完全没有 ≠ 有一点点。</strong>只要缺数据的一方能拿出极少量（千分之几）的真实记录来校准——我们叫它<strong>锚点</strong>——"借用"就从不可能变成可能，而且效果可观。下面纽约、芝加哥两站实验，就是这句话的证据。</p>
+      </div>
+      <div class="glossary reveal">
+        <div class="glossary-title">本页词汇表（后文只用这些说法）</div>
+        <div class="glossary-grid">
+          <div class="chip"><span class="chip-key">流向表</span><span class="chip-value">"从哪个区到哪个区各多少人"的大表格，即专业上的 OD 表</span></div>
+          <div class="chip"><span class="chip-key">目标方式</span><span class="chip-value">缺数据、等着被补全的交通方式</span></div>
+          <div class="chip"><span class="chip-key">参考方式</span><span class="chip-value">数据丰富、拿来帮忙的交通方式</span></div>
+          <div class="chip"><span class="chip-key">锚点</span><span class="chip-value">目标方式仅存的少量真实"从哪到哪"记录，用来校准借用</span></div>
+          <div class="chip"><span class="chip-key">信息天花板</span><span class="chip-value">锚点为零时，任何模型都无法从参考方式再挤出信息的极限</span></div>
+          <div class="chip"><span class="chip-key">惯常基线</span><span class="chip-value">按"这个区、星期几的这个钟点平常多少人"查历史平均得到的估计</span></div>
+          <div class="chip"><span class="chip-key">主干流向</span><span class="chip-value">流量最大的那批"从哪到哪"（交通行话叫"走廊"）</span></div>
+          <div class="chip"><span class="chip-key">配平</span><span class="chip-value">反复微调流向表的行与列，让每区进出合计和实测总量对上</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section muted" id="data">
+      <div class="section-kicker">数据长什么样</div>
       <div class="two-column">
         <div class="reveal">
-          <h2>不是一张普通表，而是一张城市流向图。</h2>
-          <p>一个 OD 单元就是"起点社区 → 终点社区"。Taxi 和 TNC 的本地文件包含 April 一周的社区 OD 行，地图直接画出 top 跨社区流线——可以看到流量被 Loop/Near North Side（市中心）和 O'Hare（机场）两个极点主导。Divvy 的本地完整 OD parquet 没同步回来，网页只画真实站点覆盖；它的数值结果仍来自 PKU 已完成汇总。</p>
+          <h2>我们要补全的，就是这样一张流向表。</h2>
+          <p>地图是芝加哥的真实数据：全市 77 个社区，每条弧线是一条真实的"从哪到哪"，线越粗人越多。一眼能看到两个极点——市中心（Loop / Near North Side）和奥黑尔机场。城市人流有清晰的骨架，而不同交通方式在很大程度上<strong>共享同一副骨架</strong>——这是"借用"可能成立的物理基础。</p>
           <div class="plain-list">
-            <p><strong>目标源：</strong>我们想恢复的出行源，例如 TNC、Divvy，或纽约的 taxi。</p>
-            <p><strong>参考源：</strong>拿来帮忙的另一种出行源，例如 Taxi 或纽约的 Citi Bike。</p>
-            <p><strong>已知信息：</strong>目标源每小时每区进出总量，外加很少的目标 OD 标签，甚至没有标签。</p>
-            <p><strong>要输出：</strong>被隐藏的区到区流向。</p>
+            <p><strong>手里有什么：</strong>目标方式每小时、每个区"进来多少人、出去多少人"的粗统计（大多数城市都公开），再加极少量锚点。</p>
+            <p><strong>要补出什么：</strong>完整的流向表——谁到谁、各多少人。</p>
+            <p><strong>帮手是什么：</strong>参考方式的完整流向表。</p>
+            <p><strong>难在哪里：</strong>骑车的人和打车的人行为并不同步。参考方式不能照抄——必须判断哪里能信、哪里不能信。</p>
           </div>
         </div>
         <div class="data-panel reveal">
           <div class="panel-title">当前地图层</div>
           <div id="map-caption" class="map-caption"></div>
-          <div class="data-note">线越粗越亮，April 一周中这条跨社区流向越强；悬停可看单条走廊计数。点越密，Divvy 站点覆盖越集中。</div>
+          <div class="data-note">线越粗越亮，这条"从哪到哪"的人越多，悬停可看单条计数；点越密，共享单车站点越集中。</div>
         </div>
       </div>
     </section>
 
     <section class="section nyc-band" id="nyc">
-      <div class="section-kicker">纽约：这条路走通过一次</div>
+      <div class="section-kicker">第一站 · 纽约</div>
       <div class="two-column">
         <div class="reveal">
-          <h2>0.23% 的标签，误差砍掉 54.8%。</h2>
-          <p class="section-lead">NYC bike→taxi：目标侧只保留 2,048 / 900,864 条训练标签（0.23%），用 Citi Bike 作参考源恢复 taxi 需求。三个台阶清楚地区分了"source 有没有用"和"模型会不会用"。</p>
+          <h2>只用 0.23% 的真实记录，误差砍掉一半。</h2>
+          <p class="section-lead">我们做了一次严格的模拟考试：假装纽约出租车（目标方式）的流向记录丢了 99.77%，只留 2,048 条做锚点，然后用共享单车 Citi Bike（参考方式）的完整数据来补。判分标准是<strong>平均误差率</strong>（专业名 WAPE）：预测和真实平均差多少个百分点，越低越好。</p>
           <div id="nyc-ladder" class="chart-frame slim"></div>
-          <p class="fine-print">同一数据、同一监督下，旧的复杂架构（SPMF）停在 0.70 左右（512/2048 anchor 均如此）——成功来自更健康的训练范式，不是机制堆叠。凭据见证据表 E-NYC-1 / E-NYC-2。</p>
+          <p class="fine-print">诚实记录：我们更早的一版模型机制复杂得多，在同样的数据上误差停在 70% 左右，怎么调都下不去。教训是"训练方式比机制堆叠重要"——这直接塑造了下一节的模型设计。凭据见页尾证据表 E-NYC-1 / E-NYC-2。</p>
         </div>
         <div class="reveal">
           <div class="chip-grid" id="nyc-chips"></div>
           <div class="nyc-note">
-            <h3>为什么这一步重要</h3>
-            <p>它锁定了主张的形态：<strong>target-zero 跨源恢复被信息界卡死，但 target-sparse 可行</strong>。极少量目标标签负责校准"方向、强度、滞后"，参考源提供其余结构。芝加哥基准随后回答同一主张在 OD/走廊粒度上的普遍性。</p>
+            <h3>这一步为什么重要</h3>
+            <p>它划清了可行与不可行的边界。锚点为零时，我们实测撞上<strong>信息天花板</strong>——什么模型都赢不了笨办法；锚点只要千分之几，借用就成立且收益可观。所以正确的问题不是"能不能无中生有"，而是<strong>"最少要多少锚点、怎么借最聪明"</strong>。</p>
           </div>
         </div>
       </div>
     </section>
 
     <section class="section muted" id="model">
-      <div class="section-kicker">模型长什么样</div>
-      <h2>两个真实架构：纽约的神经翻译器，芝加哥的残差网络 + 路由。</h2>
-      <p class="section-lead">核心思想一致：<strong>目标先验负责"平常"，网络只学"参考源能解释的残差"，再判断哪一段修正值得信。</strong>下面是按训练配置画出的真实结构，不是示意框图。</p>
+      <div class="section-kicker">打开黑箱</div>
+      <h2>模型的真实构造：平常靠查表，例外靠网络，出格靠规则拦住。</h2>
+      <p class="section-lead">两个模型共享同一条设计哲学：<strong>惯常基线负责"平常"，神经网络只学"参考方式能解释的那部分偏差"，最后用规则保证结果不出格、不帮倒忙。</strong>图里每个框都来自真实训练配置，不是示意画。</p>
       <div class="arch-tabs" data-arch-tabs>
-        <button class="active" data-arch="nyc">NYC · G113 teacher-first 翻译器</button>
-        <button data-arch="chicago">Chicago · G160 深度基线 + 路由</button>
+        <button class="active" data-arch="nyc">纽约 · 聪明借用模型</button>
+        <button data-arch="chicago">芝加哥 · 赛场上的深度选手</button>
       </div>
       <div id="arch-visual" class="arch-visual" aria-live="polite"></div>
       <div id="arch-notes" class="arch-notes"></div>
     </section>
 
     <section class="section results" id="results">
-      <div class="section-kicker">结果怎么读：优势在哪、边界在哪</div>
+      <div class="section-kicker">第二站 · 芝加哥大对比</div>
       <div class="results-head">
         <div class="reveal">
-          <h2>三层证据：总量优势 → 按指标优势 → 谁在赢。</h2>
-          <p>"平均改进"表示：同一批任务单元上，跨源方法族中最好的结果相对只看目标源的方法族中最好的结果平均改善多少。往下两张图把它拆开：优势集中在哪些指标，以及在难任务上是哪一类方法在赢。</p>
+          <h2>借用赢了多少、在哪里赢、靠谁赢。</h2>
+          <p>纽约证明"单点可行"之后，我们在芝加哥搭了一个赛场：77 个社区、四个季节，出租车、网约车、共享单车两两互借，<strong>47 种方法同场竞技</strong>——从"完全不借"到各式深度网络，还故意混入了拿打乱数据参赛的"陷阱选手"。每个考题让两个阵营各派最强者对决：<strong>借用阵营</strong>（利用参考方式）对<strong>不借阵营</strong>（只用目标方式自己的信息）。下图的"平均改进"就是借用阵营赢过不借阵营的幅度。</p>
         </div>
         <div class="chart-tabs" data-chart-tabs>
           <button class="active" data-chart="overall">总览</button>
-          <button data-chart="direction">方向</button>
-          <button data-chart="split">走廊类型</button>
-          <button data-chart="budget">目标标签</button>
+          <button data-chart="direction">谁补谁</button>
+          <button data-chart="split">考题类型</button>
+          <button data-chart="budget">锚点多少</button>
         </div>
       </div>
       <div id="result-chart" class="chart-frame reveal"></div>
 
       <div class="result-duo">
         <div class="reveal">
-          <h3>按指标看：优势集中在流量强度与分布形状</h3>
+          <h3>按什么标准赢：流量大小和分布形状全面占优</h3>
+          <p class="chart-note">每行是一种判分标准（括号里是专业名），虚线是五五开。绿色越长，借用阵营赢面越大；红色是输面——我们没有藏。</p>
           <div class="pair-tabs" data-pair-tabs>
-            <button class="active" data-pair="taxi_tnc">Taxi ↔ TNC（同模态）</button>
-            <button data-pair="taxi_divvy">Taxi ↔ Divvy（跨方式）</button>
+            <button class="active" data-pair="taxi_tnc">同类互借（出租车↔网约车）</button>
+            <button data-pair="taxi_divvy">跨方式（出租车↔单车）</button>
           </div>
           <div id="metric-chart" class="chart-frame slim"></div>
         </div>
         <div class="reveal">
-          <h3>谁在赢：任务变难时，深度网络和路由器上位</h3>
-          <p class="chart-note">1040 个评测格里"最佳跨源方法"的类别构成。同模态时简单直接借用就够；跨方式时，深度网络 + 可靠性路由承担主力——这就是深度方法的位置。</p>
+          <h3>靠谁赢：考题越难，深度网络越重要</h3>
+          <p class="chart-note">每个考题里，替借用阵营出战获胜的是哪类方法？同类互借时"简单换算"就够用；换成跨方式的难题，深度网络和带裁判的借用扛起六成——<strong>深度学习的价值恰恰出现在难题上</strong>。</p>
           <div id="mix-chart" class="chart-frame slim"></div>
         </div>
       </div>
 
       <div class="result-notes">
-        <p><strong>Taxi/TNC：</strong>同类道路源，胜出率 77.98%，平均改进 0.2447（95% CI [0.198, 0.295]）。RMSE/CPC/JSD 等强度与形状指标胜率 91%–99%。</p>
-        <p><strong>Taxi/Divvy：</strong>跨出行方式更难，胜出率 60.96%，平均改进 0.1130；高流量走廊（+0.213）明显强于长距离走廊（+0.013）。留出走廊 log MAE 胜率仅 31%，是当前最诚实的短板。</p>
+        <p><strong>同类互借（出租车↔网约车）：</strong>1040 个考题赢 811 个（78.0%），平均改进 0.245。流量大小、分布形状类的标准上胜率高达 91%–99%。</p>
+        <p><strong>跨方式（出租车↔单车）：</strong>更难，赢 61.0%，平均改进 0.113。主干流向上收益明显（+0.213），长距离流向几乎持平（+0.013）；"从未见过的流向"这条标准只赢 31%——这是目前最大的短板，我们如实展示。</p>
       </div>
     </section>
 
     <section class="section muted" id="limits">
-      <div class="section-kicker">现在还不能夸大的地方</div>
+      <div class="section-kicker">有一说一</div>
       <div class="status-grid">
         <article class="reveal">
-          <h3>已经知道</h3>
-          <p>参考源有真实价值：NYC 单模型 -54.8%，Chicago 两组设置的方法族收益均显著（sign-flip p≈0.0002）。优势集中在高流量走廊与强度/形状指标。</p>
+          <h3>已经确认</h3>
+          <p>借用真的有价值：纽约单个模型误差减半；芝加哥两个赛场借用阵营的胜率都远高于抛硬币，统计检验非常显著。价值最集中的地方是主干流向。</p>
         </article>
         <article class="reveal">
-          <h3>还不知道</h3>
-          <p>Chicago 侧仍是方法族比较，固定单一模型尚未锁定；no-harm 率在 Taxi/TNC 上是负项（20%），负控偶尔被选中——"什么时候信 source"必须做进模型。</p>
+          <h3>还没做到</h3>
+          <p>芝加哥侧还是"阵营对阵营"的比较，尚未定型成一个拿来就用的单一模型；裁判偶尔会被陷阱选手骗到（见下图）；"不帮倒忙"这条标准在同类互借里只赢了两成——判断力必须做进模型里。</p>
         </article>
         <article class="reveal">
-          <h3>下一步</h3>
-          <p>把 NYC 已验证的 teacher-first 范式和 Chicago 的可靠性路由合并成固定模型：先估计 target-only 能解释多少，再判断 source 骨架可信度，只在可信处修正。</p>
+          <h3>正在做</h3>
+          <p>把纽约验证过的"聪明借用"训练方式和芝加哥验证过的"裁判"机制合成一个模型：先算惯常基线能解释多少，再判断参考骨架可不可信，只在可信的地方动笔。</p>
         </article>
       </div>
       <div id="null-chart" class="null-chart reveal"></div>
     </section>
 
     <section class="section evidence-section">
-      <div class="section-kicker">证据来源</div>
-      <h2>网页中的结论都绑定到本地文件。</h2>
+      <div class="section-kicker">给同行看的部分</div>
+      <h2>每个结论都能落到原始文件。</h2>
+      <p class="section-lead">上面所有白话结论都有对应的实验结果文件，欢迎逐条核查。证据表保留项目内部名词，方便与代码和报告对照。</p>
       <button id="toggle-evidence" class="secondary-link evidence-button">展开证据表</button>
       <div id="evidence-list" class="evidence-list" hidden></div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <p>本 briefing 只整理已有实验结果，不新增实验 claim。完整路径见页面证据表。</p>
+    <p>本页只整理已完成实验的结果，不新增任何未经验证的说法。完整文件路径见证据表。</p>
   </footer>
 
   <script src="assets/briefing_data.js"></script>

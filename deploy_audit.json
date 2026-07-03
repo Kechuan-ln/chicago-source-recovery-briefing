@@ -1,23 +1,139 @@
 {
   "ok": true,
-  "generated_at": "2026-07-03T05:08:07Z",
-  "site": "/private/tmp/chicago-source-recovery-pages.l2N3LZ",
-  "file_count": 7,
-  "total_bytes": 230778,
+  "generated_at": "2026-07-03T08:36:26Z",
+  "site": "/private/tmp/chicago-source-recovery-redeploy.4EWXR1",
+  "file_count": 36,
+  "total_bytes": 340495,
   "errors": [],
   "warnings": [],
   "files": [
+    {
+      "path": ".git/HEAD",
+      "size_bytes": 21
+    },
+    {
+      "path": ".git/config",
+      "size_bytes": 338
+    },
+    {
+      "path": ".git/description",
+      "size_bytes": 73
+    },
+    {
+      "path": ".git/hooks/applypatch-msg.sample",
+      "size_bytes": 478
+    },
+    {
+      "path": ".git/hooks/commit-msg.sample",
+      "size_bytes": 896
+    },
+    {
+      "path": ".git/hooks/fsmonitor-watchman.sample",
+      "size_bytes": 4726
+    },
+    {
+      "path": ".git/hooks/post-update.sample",
+      "size_bytes": 189
+    },
+    {
+      "path": ".git/hooks/pre-applypatch.sample",
+      "size_bytes": 424
+    },
+    {
+      "path": ".git/hooks/pre-commit.sample",
+      "size_bytes": 1649
+    },
+    {
+      "path": ".git/hooks/pre-merge-commit.sample",
+      "size_bytes": 416
+    },
+    {
+      "path": ".git/hooks/pre-push.sample",
+      "size_bytes": 1374
+    },
+    {
+      "path": ".git/hooks/pre-rebase.sample",
+      "size_bytes": 4898
+    },
+    {
+      "path": ".git/hooks/pre-receive.sample",
+      "size_bytes": 544
+    },
+    {
+      "path": ".git/hooks/prepare-commit-msg.sample",
+      "size_bytes": 1492
+    },
+    {
+      "path": ".git/hooks/push-to-checkout.sample",
+      "size_bytes": 2783
+    },
+    {
+      "path": ".git/hooks/sendemail-validate.sample",
+      "size_bytes": 2308
+    },
+    {
+      "path": ".git/hooks/update.sample",
+      "size_bytes": 3650
+    },
+    {
+      "path": ".git/index",
+      "size_bytes": 58
+    },
+    {
+      "path": ".git/info/exclude",
+      "size_bytes": 240
+    },
+    {
+      "path": ".git/logs/HEAD",
+      "size_bytes": 216
+    },
+    {
+      "path": ".git/logs/refs/heads/main",
+      "size_bytes": 216
+    },
+    {
+      "path": ".git/logs/refs/remotes/origin/HEAD",
+      "size_bytes": 216
+    },
+    {
+      "path": ".git/objects/pack/pack-44bba3ab9c9c24b944ef05f249b85671028424fa.idx",
+      "size_bytes": 1380
+    },
+    {
+      "path": ".git/objects/pack/pack-44bba3ab9c9c24b944ef05f249b85671028424fa.pack",
+      "size_bytes": 68895
+    },
+    {
+      "path": ".git/objects/pack/pack-44bba3ab9c9c24b944ef05f249b85671028424fa.rev",
+      "size_bytes": 96
+    },
+    {
+      "path": ".git/packed-refs",
+      "size_bytes": 112
+    },
+    {
+      "path": ".git/refs/heads/main",
+      "size_bytes": 41
+    },
+    {
+      "path": ".git/refs/remotes/origin/HEAD",
+      "size_bytes": 30
+    },
+    {
+      "path": ".git/shallow",
+      "size_bytes": 41
+    },
     {
       "path": ".nojekyll",
       "size_bytes": 0
     },
     {
       "path": "README.md",
-      "size_bytes": 291
+      "size_bytes": 320
     },
     {
       "path": "app.js",
-      "size_bytes": 29047
+      "size_bytes": 33130
     },
     {
       "path": "assets/briefing_data.js",
@@ -29,11 +145,11 @@
     },
     {
       "path": "index.html",
-      "size_bytes": 10241
+      "size_bytes": 16273
     },
     {
       "path": "styles.css",
-      "size_bytes": 11788
+      "size_bytes": 13561
     }
   ]
 }

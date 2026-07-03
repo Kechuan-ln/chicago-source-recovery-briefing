@@ -29,14 +29,85 @@ function svgText(svg, x, y, content, attrs = {}) {
   return t;
 }
 
+/* ============ 白话翻译层：数据里的内部名词只在这里出现一次 ============ */
+
+const PAIR_PLAIN = {
+  "Taxi/TNC": "同类互借（出租车↔网约车）",
+  "Taxi/Divvy": "跨方式（出租车↔单车）",
+};
+
+const DIRECTION_PLAIN = {
+  "taxi → tnc": "用出租车 补 网约车",
+  "tnc → taxi": "用网约车 补 出租车",
+  "divvy → taxi": "用单车 补 出租车",
+  "taxi → divvy": "用出租车 补 单车",
+};
+
+function plainChartLabel(item) {
+  const label = item.label || "";
+  if (chartState.active === "overall") return PAIR_PLAIN[item.sourcePair] || label;
+  if (chartState.active === "direction") return DIRECTION_PLAIN[label] || label;
+  if (chartState.active === "split") {
+    return label.replace("高流量走廊被隐藏", "考题：补主干流向").replace("长距离走廊被隐藏", "考题：补长距离流向");
+  }
+  // budget: "Taxi/TNC 目标标签 0.1%" → "锚点 0.1%"
+  const m = label.match(/([\d.]+%)$/);
+  return m ? `锚点 ${m[1]}` : label;
+}
+
+const LADDER_PLAIN = {
+  frozen_baseline: {
+    label: "完全不借",
+    sub: "只查惯常基线：这个区、星期几的这个钟点，平常多少人",
+  },
+  source_direct_concat: {
+    label: "简单换算",
+    sub: "单车流量乘一个系数当出租车流量——证明参考方式有用",
+  },
+  g113_teacher_first_neural_translator: {
+    label: "聪明借用（我们的模型）",
+    sub: "小神经网络判断：何时该信单车，何时守住惯常基线",
+  },
+};
+
+const METRIC_PLAIN = {
+  positive_cpc: "和真实流向的重合度（CPC）",
+  positive_rmse: "流量数值误差（RMSE）",
+  positive_nrmse: "流量误差·按规模折算（NRMSE）",
+  js_divergence: "整体分布形状（JSD）",
+  trip_length_l1: "出行距离构成（L1）",
+  topk_ndcg: "最大流向的排序（NDCG）",
+  topk_precision: "找主干流向：找得准",
+  topk_recall: "找主干流向：找得全",
+  normalized_srmse: "结构误差（SRMSE）",
+  high_flow_log_mae: "主干流向的误差（log MAE）",
+  positive_log_mae: "整体误差（log MAE）",
+  heldout_corridor_log_mae: "从未见过的流向（log MAE）",
+  no_harm_rate: "不帮倒忙率",
+};
+
+const MIX_PLAIN = {
+  direct: "直接换算类",
+  align: "分布对齐类",
+  routed: "带裁判的借用",
+  deep: "深度网络",
+  hybrid: "锚点+借用混合",
+  null: "陷阱选手",
+};
+
+const NULL_ROW_PLAIN = {
+  "Taxi/TNC": "同类互借赛场",
+  "Taxi/Divvy": "跨方式赛场",
+};
+
 /* ---------------- hero map ---------------- */
 
 function setupTabs() {
   const tabs = document.querySelector("[data-map-tabs]");
   const sources = [
-    ["taxi", "Taxi 流线"],
-    ["tnc", "TNC 流线"],
-    ["divvy", "Divvy 站点"],
+    ["taxi", "出租车流向"],
+    ["tnc", "网约车流向"],
+    ["divvy", "共享单车站点"],
   ];
   tabs.innerHTML = sources.map(([key, label]) => `<button data-source="${key}" class="${key === sourceState.active ? "active" : ""}">${label}</button>`).join("");
   tabs.addEventListener("click", (event) => {
@@ -68,7 +139,7 @@ function renderMap() {
   const map = DATA.map;
   const source = DATA.sources[sourceState.active];
   container.innerHTML = "";
-  const svg = createSvg("svg", { viewBox: `0 0 ${map.width} ${map.height}`, role: "img", "aria-label": "Chicago community area map" });
+  const svg = createSvg("svg", { viewBox: `0 0 ${map.width} ${map.height}`, role: "img", "aria-label": "芝加哥社区人流地图" });
 
   const areaLayer = createSvg("g", { class: "area-layer" });
   map.areas.forEach((area) => {
@@ -86,7 +157,7 @@ function renderMap() {
         d: flowPath(flow),
         "stroke-width": (1.4 + share * 5.6).toFixed(2),
         opacity: (0.3 + share * 0.55).toFixed(2),
-        "data-tip": `${flow.originName} → ${flow.destinationName}<br>April 一周计数：${flow.count.toLocaleString()}`,
+        "data-tip": `${flow.originName} → ${flow.destinationName}<br>4 月一周的出行次数：${flow.count.toLocaleString()}`,
       });
       path.addEventListener("mouseenter", () => flowLayer.classList.add("dimmed"));
       path.addEventListener("mouseleave", () => flowLayer.classList.remove("dimmed"));
@@ -102,7 +173,7 @@ function renderMap() {
         cy: station.y,
         r: 3.1,
         opacity: 0.78,
-        "data-tip": `${station.name}<br>Station ID: ${station.id}`,
+        "data-tip": `${station.name}<br>站点编号：${station.id}`,
       }));
     });
     svg.appendChild(stationLayer);
@@ -117,10 +188,9 @@ function renderMap() {
   const labelLayer = createSvg("g", { class: "map-label-layer" });
   map.areas.filter((a) => MAP_LABELS.includes(a.name)).forEach((area) => {
     const display = area.name === "Ohare" ? "O'Hare 机场" : area.name;
-    const anchor = area.name === "Ohare" ? "start" : "start";
-    const halo = createSvg("text", { x: area.cx + 8, y: area.cy - 6, class: "map-label halo", "text-anchor": anchor });
+    const halo = createSvg("text", { x: area.cx + 8, y: area.cy - 6, class: "map-label halo", "text-anchor": "start" });
     halo.textContent = display;
-    const label = createSvg("text", { x: area.cx + 8, y: area.cy - 6, class: "map-label", "text-anchor": anchor });
+    const label = createSvg("text", { x: area.cx + 8, y: area.cy - 6, class: "map-label", "text-anchor": "start" });
     label.textContent = display;
     labelLayer.appendChild(halo);
     labelLayer.appendChild(label);
@@ -130,10 +200,12 @@ function renderMap() {
   container.appendChild(svg);
   attachMapTooltip(container);
 
-  if (source.kind === "flows") {
-    caption.innerHTML = `${source.label}：${source.summary}<br>本地 OD 行 ${source.rows.toLocaleString()} 条，总计 ${source.total.toLocaleString()} 次，地图显示 top ${source.flows.length} 条跨社区流向——市中心（Loop / Near North Side）与 O'Hare 机场是两个极点。`;
+  if (sourceState.active === "taxi") {
+    caption.innerHTML = `出租车：真实记录的 4 月一周流向，共 ${source.rows.toLocaleString()} 条"从哪到哪"、合计 ${source.total.toLocaleString()} 次出行。图中画出最大的 ${source.flows.length} 条——市中心和机场是两个极点。`;
+  } else if (sourceState.active === "tnc") {
+    caption.innerHTML = `网约车：同一周的真实流向，共 ${source.rows.toLocaleString()} 条记录、${source.total.toLocaleString()} 次出行，比出租车更密。在芝加哥赛场里，它和出租车互为"最像的邻居"。`;
   } else {
-    caption.innerHTML = `${source.label}：${source.summary}<br>April 站点 ${source.stationCount} 个，实验周映射事件约 ${Math.round(source.eventsInWeek).toLocaleString()} 次。<br><span class="subtle">${source.note}</span>`;
+    caption.innerHTML = `共享单车：图中是 ${source.stationCount} 个真实站点的分布（实验周内约 ${Math.round(source.eventsInWeek).toLocaleString()} 次骑行）。<br><span class="subtle">它的完整流向表恰好没有同步到本机——这正是"目标方式"缺数据处境的真实写照。页面里它的成绩来自计算集群上已完成的汇总。</span>`;
   }
 }
 
@@ -164,34 +236,36 @@ function renderNycLadder() {
   container.innerHTML = "";
   const width = 880;
   const pad = 20;
-  const rowH = 84;
-  const height = 60 + nyc.ladder.length * rowH + 36;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "NYC 三个台阶的 WAPE 对比" });
-  const left = 270;
+  const rowH = 88;
+  const height = 64 + nyc.ladder.length * rowH + 40;
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "纽约实验三种做法的平均误差对比" });
+  const left = 290;
   const right = width - 130;
   const maxV = Math.max(...nyc.ladder.map((d) => d.rawWape));
   const scale = (v) => (v / maxV) * (right - left);
   const colors = ["#9d9487", "#c5972f", "#0c7c72"];
 
-  svgText(svg, left, 30, "test raw WAPE（越低越好） · 16,384 行测试集", { fill: "#59645f", "font-size": 14 });
+  svgText(svg, left, 30, `平均误差率（越低越好） · ${nyc.testRows.toLocaleString()} 个考题`, { fill: "#59645f", "font-size": 14 });
 
   nyc.ladder.forEach((row, i) => {
-    const y = 56 + i * rowH;
-    svgText(svg, pad, y + 22, row.label, { fill: "#17201c", "font-size": 16, "font-weight": 700 });
-    svgText(svg, pad, y + 42, row.sub, { fill: "#59645f", "font-size": 12.5 });
+    const plain = LADDER_PLAIN[row.model] || { label: row.label, sub: row.sub };
+    const y = 60 + i * rowH;
+    svgText(svg, pad, y + 20, plain.label, { fill: "#17201c", "font-size": 16, "font-weight": 700 });
+    plain.sub.match(/.{1,22}/g).forEach((line, j) => {
+      svgText(svg, pad, y + 40 + j * 15, line, { fill: "#59645f", "font-size": 12 });
+    });
     svg.appendChild(createSvg("rect", { x: left, y: y + 6, width: right - left, height: 30, fill: "#efeadf", rx: 4 }));
     const w = scale(row.rawWape);
     svg.appendChild(createSvg("rect", { x: left, y: y + 6, width: w, height: 30, fill: colors[i], rx: 4, class: "grow-bar" }));
-    svgText(svg, left + w + 10, y + 27, fmt(row.rawWape, 3), { fill: "#17201c", "font-size": 17, "font-weight": 800 });
+    svgText(svg, left + w + 10, y + 27, percent(row.rawWape, 1), { fill: "#17201c", "font-size": 17, "font-weight": 800 });
     if (i > 0) {
       const prev = nyc.ladder[i - 1].rawWape;
       const drop = ((prev - row.rawWape) / prev) * 100;
-      svgText(svg, right + 14, y + 27, `↓${drop.toFixed(0)}%`, { fill: "#0c7c72", "font-size": 14, "font-weight": 700 });
+      svgText(svg, right + 14, y + 27, `再降${drop.toFixed(0)}%`, { fill: "#0c7c72", "font-size": 13.5, "font-weight": 700 });
     }
   });
 
-  const total = ((nyc.ladder[0].rawWape - nyc.ladder[2].rawWape) / nyc.ladder[0].rawWape) * 100;
-  svgText(svg, pad, height - 8, `总降幅 ${total.toFixed(1)}%：source 有用（台阶 1→2），而且模型比线性借用会用（台阶 2→3）。`, { fill: "#17201c", "font-size": 14, "font-weight": 700 });
+  svgText(svg, pad, height - 10, "误差从 77.7% 降到 35.1%：借用有效（第 1→2 行），而且“会借”比“硬借”更值钱（第 2→3 行）。", { fill: "#17201c", "font-size": 14, "font-weight": 700 });
   container.appendChild(svg);
 }
 
@@ -199,14 +273,14 @@ function renderNycChips() {
   const nyc = DATA.nyc;
   const g = nyc.ladder[2];
   const chips = [
-    ["目标标签", `${nyc.trainRows.toLocaleString()} / ${nyc.trainFull.toLocaleString()} 行（${nyc.labelPct}%）`],
-    ["空间/时间粒度", `${nyc.zones} zones · ${nyc.interval}`],
-    ["输入特征", `${nyc.fit.featureDim} 维（source 流量、时间、空间、先验残差）`],
-    ["网络", `MLP 隐层 ${nyc.fit.hiddenDim} · dropout ${nyc.fit.dropout}`],
-    ["热点检测 F1", fmt(g.hotspotF1, 3)],
-    ["残差方向相关", fmt(g.signedCorr, 3)],
-    ["事件窗口 WAPE", `${fmt(g.srcRequiredWape, 3)}（source-required）`],
-    ["anchor 占比", `${percent(nyc.anchorFrac, 2)}（非 anchor 区照样恢复）`],
+    ["锚点数量", `${nyc.trainRows.toLocaleString()} / ${nyc.trainFull.toLocaleString()} 条（仅 ${nyc.labelPct}%）`],
+    ["城市划分", `${nyc.zones} 个区 · 每 30 分钟一格`],
+    ["模型输入", `每格 ${nyc.fit.featureDim} 个数字（单车流量、时间、地点、惯常偏差）`],
+    ["模型大小", `一层 ${nyc.fit.hiddenDim} 个神经元的小网络，笔记本就能训练`],
+    ["突发人流识别", `F1 ${fmt(g.hotspotF1, 2)}：十次高峰能抓到约八次`],
+    ["涨跌方向判断", `相关度 ${fmt(g.signedCorr, 2)}：该升该降基本不看错`],
+    ["最难时段的误差", `${percent(g.srcRequiredWape, 1)}（必须靠单车才能答对的时段）`],
+    ["锚点覆盖", `只覆盖 ${percent(nyc.anchorFrac, 1)} 的区，其余区照样恢复`],
   ];
   document.getElementById("nyc-chips").innerHTML = chips.map(([k, v]) => `
     <div class="chip"><span class="chip-key">${k}</span><span class="chip-value">${v}</span></div>
@@ -216,8 +290,8 @@ function renderNycChips() {
 /* ---------------- architecture diagrams ---------------- */
 
 const ARCH_NOTES = {
-  nyc: `<p><strong>训练配置（来自 run JSON，非示意）：</strong>2,048 训练行 · lr 1e-3 · weight decay 1e-4 · grad clip 5 · best epoch 59。teacher = 直接 ridge 翻译器（val residual WAPE 0.544），学生 MLP 收敛到 0.366 —— 学生明确超过了教师。损失为加权残差回归，source-required 事件窗口加权采样。</p>`,
-  chicago: `<p><strong>训练配置（来自 eval_stage23_gf_od_sparse_estimation.py）：</strong>SmoothL1 损失 · AdamW lr 3e-3 · weight decay 1e-4 · batch 4096。深度族共 5 类（base / graph / tgcn / geml / dneat）× 3 种输入（target / aux / target+aux）= 15 个深度方法，与 32 个非深度方法同场对比。IPF 投影保证输出非负且与观测边际一致。</p>`,
+  nyc: `<p><strong>训练明细（来自实验记录文件，非示意）：</strong>只用 2,048 条锚点训练；训练时对"必须靠单车才能答对"的时段加权，逼网络学会借。"老师"是简单换算（验证集误差 54.4%），学生网络最终 36.6%——学生明确超过了老师，说明网络学到了换算学不到的东西。</p>`,
+  chicago: `<p><strong>训练明细（来自评测代码）：</strong>损失函数对离群值稳健（SmoothL1），每批训练 4,096 条。这类深度选手共 5 个家族 × 3 种输入组合 = 15 个，与 32 个非深度方法同场竞技。"配平"步骤保证输出永远非负、且每区进出合计与实测分毫不差。</p>`,
 };
 
 function archBlock(svg, x, y, w, h, title, sub, kind) {
@@ -260,14 +334,14 @@ function archDefs(svg) {
 function archLegend(svg, x, y) {
   const items = [
     ["input", "输入数据"],
-    ["train", "可训练"],
-    ["frozen", "冻结 / 规则"],
-    ["post", "约束后处理"],
+    ["train", "可训练（会学习）"],
+    ["frozen", "查表 / 固定规则"],
+    ["post", "安全约束"],
   ];
   const fills = { input: "#fffdf8", train: "#d8efea", frozen: "#ece9e1", post: "#f6ecd4" };
   const strokes = { input: "#c4573f", train: "#0c7c72", frozen: "#9d9487", post: "#c5972f" };
   items.forEach(([kind, label], i) => {
-    const lx = x + i * 128;
+    const lx = x + i * 150;
     svg.appendChild(createSvg("rect", { x: lx, y: y - 11, width: 16, height: 12, rx: 3, fill: fills[kind], stroke: strokes[kind], "stroke-width": 1.4 }));
     svgText(svg, lx + 22, y, label, { fill: "#59645f", "font-size": 12.5 });
   });
@@ -276,17 +350,17 @@ function archLegend(svg, x, y) {
 function renderArchNyc(container) {
   const width = 1160;
   const height = 540;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "NYC G113 teacher-first 神经翻译器结构" });
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "纽约聪明借用模型的结构" });
   archDefs(svg);
 
-  svgText(svg, 24, 34, "G113 teacher-first 神经翻译器（NYC bike→taxi）", { fill: "#17201c", "font-size": 19, "font-weight": 800 });
-  svgText(svg, 24, 56, "预测 = 冻结的目标先验 + 网络学到的“source 能解释的残差”", { fill: "#59645f", "font-size": 13.5 });
+  svgText(svg, 24, 34, "聪明借用模型（纽约：用共享单车补出租车）", { fill: "#17201c", "font-size": 19, "font-weight": 800 });
+  svgText(svg, 24, 56, "预测 = 惯常基线（查表） + 网络学到的“单车能解释的偏差”", { fill: "#59645f", "font-size": 13.5 });
 
   const inputs = [
-    { title: "Citi Bike 流量序列", sub: ["4 通道 · 当期与滞后", "30min 粒度"] },
-    { title: "时间编码", sub: ["小时 / 星期", "周期特征"] },
-    { title: "空间编码", sub: ["69 zones", "区域指示"] },
-    { title: "先验残差 + anchor", sub: ["目标先验偏差", "anchor 图传播 1.57%"] },
+    { title: "共享单车流量", sub: ["当前时段与之前几段", "每 30 分钟一格"] },
+    { title: "时间信息", sub: ["几点、星期几", "等周期特征"] },
+    { title: "地点信息", sub: ["69 个区", "的编号"] },
+    { title: "惯常偏差 + 锚点", sub: ["现在比平常多多少", "1.57% 区的实时读数"] },
   ];
   const inW = 200; const inH = 80; const inX = 24;
   inputs.forEach((b, i) => {
@@ -295,74 +369,74 @@ function renderArchNyc(container) {
     archArrow(svg, inX + inW, y + inH / 2, 300, 268);
   });
 
-  archBlock(svg, 300, 230, 150, 76, ["特征向量", "x ∈ R⁹¹"], "拼接归一", "frozen");
+  archBlock(svg, 300, 230, 150, 76, ["拼成一行", "91 个数字"], null, "frozen");
   archArrow(svg, 450, 268, 496, 268);
-  archBlock(svg, 496, 216, 190, 104, ["Dense 91→256", "ReLU"], ["Dropout 0.05"], "train");
+  archBlock(svg, 496, 216, 190, 104, ["全连接层", "91 → 256"], ["256 个神经元", "训练时随机屏蔽 5% 防死记"], "train");
   archArrow(svg, 686, 268, 730, 268);
-  archBlock(svg, 730, 230, 160, 76, ["Dense 256→1"], ["残差输出 r̂"], "train");
+  archBlock(svg, 730, 230, 160, 76, ["全连接层", "256 → 1"], ["输出：对惯常的修正量"], "train");
   archArrow(svg, 890, 268, 950, 268);
 
   svg.appendChild(createSvg("circle", { cx: 972, cy: 268, r: 20, fill: "#fffdf8", stroke: "#17201c", "stroke-width": 1.6 }));
   svgText(svg, 972, 274, "⊕", { "text-anchor": "middle", fill: "#17201c", "font-size": 20, "font-weight": 700 });
   archArrow(svg, 992, 268, 1022, 268);
-  archBlock(svg, 1022, 230, 118, 76, ["taxi 需求", "预测"], null, "out");
+  archBlock(svg, 1022, 230, 118, 76, ["出租车需求", "预测"], null, "out");
 
-  archBlock(svg, 496, 356, 190, 64, ["Ridge 教师"], ["source 直接翻译", "val WAPE 0.544"], "frozen");
+  archBlock(svg, 496, 356, 190, 64, ["简单换算（老师）"], ["先给学生打底", "老师自己误差 54.4%"], "frozen");
   archArrow(svg, 591, 356, 591, 324, true);
-  svgText(svg, 700, 392, "teacher-first：教师先行，学生 MLP 超越（0.366）", { fill: "#59645f", "font-size": 12.5 });
+  svgText(svg, 700, 392, "先训老师、再训学生；学生（36.6%）必须超过老师才算数", { fill: "#59645f", "font-size": 12.5 });
 
-  archBlock(svg, 24, 462, 340, 64, ["目标先验（冻结）"], ["zone × hour-of-week 经验均值，先训练后冻结"], "frozen");
+  archBlock(svg, 24, 462, 340, 64, ["惯常基线（查表，不训练）"], ["每个区 × 一周 168 个钟点的历史平均"], "frozen");
   archArrow(svg, 364, 494, 966, 286);
 
-  archLegend(svg, 620, height - 14);
+  archLegend(svg, 560, height - 14);
   container.appendChild(svg);
 }
 
 function renderArchChicago(container) {
   const width = 1160;
   const height = 500;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Chicago G160 深度残差网络与路由结构" });
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "芝加哥赛场深度选手的结构" });
   archDefs(svg);
 
-  svgText(svg, 24, 34, "G160 深度基线 ODResidualMLP + 可靠性路由（Chicago 47 方法基准中的深度分支）", { fill: "#17201c", "font-size": 19, "font-weight": 800 });
-  svgText(svg, 24, 56, "网络只学 log 残差；非负与边际一致由 IPF 投影在结构上保证", { fill: "#59645f", "font-size": 13.5 });
+  svgText(svg, 24, 34, "赛场上的深度选手（芝加哥 47 方法中的神经网络一支）", { fill: "#17201c", "font-size": 19, "font-weight": 800 });
+  svgText(svg, 24, 56, "网络只学“每格流量该乘多少的修正”；不出负数、进出合计对得上，由“配平”在结构上保证", { fill: "#59645f", "font-size": 13.5 });
 
   const embY = 84;
   const embs = [
-    { title: "时间 id", sub: "Embedding 12 维" },
-    { title: "起点区 id", sub: "Embedding 12 维" },
-    { title: "终点区 id", sub: "Embedding 12 维" },
+    { title: "时段编号", sub: "名片：12 个可学数字" },
+    { title: "出发区编号", sub: "名片：12 个可学数字" },
+    { title: "到达区编号", sub: "名片：12 个可学数字" },
   ];
   embs.forEach((b, i) => {
     const y = embY + i * 74;
     archBlock(svg, 24, y, 176, 62, b.title, b.sub, "train");
     archArrow(svg, 200, y + 31, 262, 250);
   });
-  archBlock(svg, 24, embY + 3 * 74, 176, 120, ["连续特征 F 维"], ["距离(3) · 目标走廊残差", "source gauge-free 残差", "图扩散 · 时间滞后", "边际上下文 / 边注意"], "input");
+  archBlock(svg, 24, embY + 3 * 74, 176, 120, ["已算好的线索"], ["两区距离 · 参考方式流量", "邻区扩散 · 历史滞后", "进出总量等"], "input");
   archArrow(svg, 200, embY + 3 * 74 + 60, 262, 262);
 
-  archBlock(svg, 262, 218, 140, 76, ["Concat", "36 + F 维"], null, "frozen");
+  archBlock(svg, 262, 218, 140, 76, ["拼成一行"], ["名片 + 线索"], "frozen");
   archArrow(svg, 402, 256, 440, 256);
-  archBlock(svg, 440, 204, 168, 104, ["Dense → 96", "ReLU"], null, "train");
+  archBlock(svg, 440, 204, 168, 104, ["全连接层 → 96"], ["96 个神经元"], "train");
   archArrow(svg, 608, 256, 636, 256);
-  archBlock(svg, 636, 204, 168, 104, ["Dense 96→96", "ReLU"], null, "train");
+  archBlock(svg, 636, 204, 168, 104, ["全连接层 96→96"], ["再加工一遍"], "train");
   archArrow(svg, 804, 256, 832, 256);
-  archBlock(svg, 832, 218, 130, 76, ["Dense 96→1"], ["log 残差 r̂"], "train");
+  archBlock(svg, 832, 218, 130, 76, ["全连接 96→1"], ["输出修正量"], "train");
   archArrow(svg, 962, 256, 990, 256);
-  archBlock(svg, 990, 196, 150, 66, ["clip r̂ ∈ [-5, 5]"], ["对角置零"], "post");
+  archBlock(svg, 990, 196, 150, 66, ["安全限幅"], ["修正幅度封顶"], "post");
   archArrow(svg, 1065, 262, 1065, 288);
-  archBlock(svg, 915, 288, 226, 62, ["kernel = prior · exp(r̂)"], null, "post");
+  archBlock(svg, 915, 288, 226, 62, ["惯常底稿 × 修正倍数"], null, "post");
   archArrow(svg, 1028, 350, 1028, 376);
-  archBlock(svg, 862, 376, 278, 66, ["IPF / Sinkhorn 边际投影"], ["输出非负 · 与观测进出总量一致"], "post");
+  archBlock(svg, 862, 376, 278, 66, ["配平"], ["微调行列，让每区进出合计", "与实测一致；结果自动非负"], "post");
 
-  archBlock(svg, 262, 376, 300, 66, ["先验 prior（冻结）"], ["目标边际独立积 / 稀疏标签校准"], "frozen");
+  archBlock(svg, 262, 376, 300, 66, ["惯常底稿（不训练）"], ["由进出总量 + 锚点搭出的粗版流向表"], "frozen");
   archArrow(svg, 562, 409, 915, 330);
 
-  archBlock(svg, 616, 376, 216, 66, ["可靠性路由器"], ["验证集判定：借用 or 回退", "safe 变体带 no-harm 约束"], "train");
+  archBlock(svg, 616, 376, 216, 66, ["裁判"], ["先在验证数据上试用借用", "不灵就退回“不借”"], "train");
   archArrow(svg, 724, 376, 724, 322, true);
-  svgText(svg, 730, 366, "逐格选择：source 不可信就回退 target-only", { fill: "#59645f", "font-size": 12 });
+  svgText(svg, 730, 366, "逐格判断：参考方式不可信，就不借", { fill: "#59645f", "font-size": 12 });
 
-  archLegend(svg, 620, height - 14);
+  archLegend(svg, 560, height - 14);
   container.appendChild(svg);
 }
 
@@ -413,9 +487,9 @@ function renderChart() {
   const container = document.getElementById("result-chart");
   container.innerHTML = "";
   const width = Math.max(860, items.length * 120 + 220);
-  const height = 400;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "跨源方法改进图" });
-  const margin = { left: 92, right: 40, top: 48, bottom: 112 };
+  const height = 420;
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "借用阵营相对不借阵营的平均改进" });
+  const margin = { left: 92, right: 40, top: 72, bottom: 118 };
   const values = items.flatMap((d) => [d.meanGain, d.ciLow, d.ciHigh]).filter((d) => d !== null && d !== undefined);
   const min = Math.min(0, ...values);
   const max = Math.max(0.05, ...values);
@@ -453,12 +527,17 @@ function renderChart() {
       svg.appendChild(createSvg("line", { x1: cx - 10, x2: cx + 10, y1: y(item.ciHigh), y2: y(item.ciHigh), stroke: "#17201c", "stroke-width": 1.6 }));
     }
     svgText(svg, cx, Math.min(barTop, zeroY) - 10, fmt(item.meanGain, 3), { "text-anchor": "middle", fill: "#17201c", "font-size": 13, "font-weight": 700 });
-    svgText(svg, cx, height - 74, item.label, { "text-anchor": "middle", fill: "#17201c", "font-size": 13, "font-weight": 700 });
-    svgText(svg, cx, height - 52, `${item.wins}/${item.cells} 胜出 · ${percent(item.winRate)}`, { "text-anchor": "middle", fill: "#59645f", "font-size": 12 });
+    svgText(svg, cx, height - 74, plainChartLabel(item), { "text-anchor": "middle", fill: "#17201c", "font-size": 13, "font-weight": 700 });
+    svgText(svg, cx, height - 52, `赢 ${item.wins}/${item.cells} 个考题 · ${percent(item.winRate)}`, { "text-anchor": "middle", fill: "#59645f", "font-size": 12 });
   });
 
-  svgText(svg, margin.left, 26, "跨源方法族相对 target-only 方法族的平均改进（正规化增益，95% CI）", { fill: "#17201c", "font-size": 17, "font-weight": 800 });
-  svgText(svg, 18, 40, "越高越好", { fill: "#59645f", "font-size": 13 });
+  svgText(svg, margin.left, 26, "借用阵营比不借阵营好多少（平均改进，竖线是 95% 置信区间）", { fill: "#17201c", "font-size": 17, "font-weight": 800 });
+  svgText(svg, 18, 44, "越高越好", { fill: "#59645f", "font-size": 13 });
+  // color legend
+  svg.appendChild(createSvg("rect", { x: margin.left, y: 40, width: 13, height: 13, rx: 3, fill: "#0c7c72" }));
+  svgText(svg, margin.left + 19, 51, "同类互借（出租车↔网约车）", { fill: "#59645f", "font-size": 12.5 });
+  svg.appendChild(createSvg("rect", { x: margin.left + 220, y: 40, width: 13, height: 13, rx: 3, fill: "#c4573f" }));
+  svgText(svg, margin.left + 239, 51, "跨方式（出租车↔单车）", { fill: "#59645f", "font-size": 12.5 });
   container.appendChild(svg);
 }
 
@@ -484,12 +563,12 @@ function renderMetricChart() {
   const rowH = 30;
   const top = 44;
   const height = top + items.length * rowH + 30;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "按指标的跨源胜率" });
-  const left = 168;
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "按判分标准看借用阵营的赢面" });
+  const left = 218;
   const right = width - 76;
   const x = (v) => left + v * (right - left);
 
-  svgText(svg, left, 24, "跨源方法族胜率（每指标 80 cells）", { fill: "#59645f", "font-size": 13 });
+  svgText(svg, left, 24, "借用阵营的赢面（每行 80 个考题）", { fill: "#59645f", "font-size": 13 });
 
   [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
     svg.appendChild(createSvg("line", { x1: x(v), x2: x(v), y1: top - 6, y2: height - 26, stroke: v === 0.5 ? "#9d9487" : "#e6e0d3", "stroke-width": v === 0.5 ? 1.4 : 1, ...(v === 0.5 ? { "stroke-dasharray": "4 3" } : {}) }));
@@ -499,14 +578,13 @@ function renderMetricChart() {
   items.forEach((item, i) => {
     const yy = top + i * rowH;
     const win = item.winRate >= 0.5;
-    const isNoHarm = item.metric === "no_harm_rate";
-    svgText(svg, left - 8, yy + 15, item.label, { "text-anchor": "end", fill: "#17201c", "font-size": 12.5, "font-weight": isNoHarm ? 700 : 500 });
+    const label = METRIC_PLAIN[item.metric] || item.label;
+    svgText(svg, left - 8, yy + 15, label, { "text-anchor": "end", fill: "#17201c", "font-size": 12.5, "font-weight": item.metric === "no_harm_rate" ? 700 : 500 });
     svg.appendChild(createSvg("rect", { x: left, y: yy + 4, width: right - left, height: 15, fill: "#f1ede3", rx: 3 }));
     svg.appendChild(createSvg("rect", { x: left, y: yy + 4, width: Math.max(2, (right - left) * item.winRate), height: 15, fill: win ? "#0c7c72" : "#c4573f", opacity: win ? 0.88 : 0.85, rx: 3, class: "grow-bar" }));
     svgText(svg, right + 8, yy + 16, percent(item.winRate, 1), { fill: win ? "#0c7c72" : "#c4573f", "font-size": 12.5, "font-weight": 700 });
   });
 
-  svgText(svg, left, height - 10 + 0, "", {});
   container.appendChild(svg);
 }
 
@@ -515,16 +593,15 @@ function renderMetricChart() {
 function renderMixChart() {
   const container = document.getElementById("mix-chart");
   container.innerHTML = "";
-  const meta = DATA.results.methodMixMeta;
   const catColors = { direct: "#c5972f", align: "#9d9487", routed: "#0c7c72", deep: "#c4573f", hybrid: "#7c6f9b", null: "#d0c9ba" };
   const cats = ["direct", "align", "routed", "deep", "hybrid", "null"];
   const rows = [
-    ["taxi_tnc", "Taxi ↔ TNC（同模态）"],
-    ["taxi_divvy", "Taxi ↔ Divvy（跨方式）"],
+    ["taxi_tnc", "同类互借（出租车↔网约车）：简单方法就够"],
+    ["taxi_divvy", "跨方式（出租车↔单车）：深度网络 + 裁判扛起六成"],
   ];
   const width = 620;
   const height = 268;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "最佳跨源方法的类别构成" });
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "替借用阵营出战获胜的方法类别构成" });
   const left = 24;
   const barW = width - left - 24;
 
@@ -551,7 +628,7 @@ function renderMixChart() {
     const lx = left + (i % perRow) * colW;
     const ly = height - 46 + Math.floor(i / perRow) * 24;
     svg.appendChild(createSvg("rect", { x: lx, y: ly - 10, width: 13, height: 13, rx: 3, fill: catColors[c] }));
-    svgText(svg, lx + 18, ly + 1, meta.catLabels[c], { fill: "#59645f", "font-size": 12 });
+    svgText(svg, lx + 18, ly + 1, MIX_PLAIN[c], { fill: "#59645f", "font-size": 12 });
   });
 
   container.appendChild(svg);
@@ -564,19 +641,20 @@ function renderNullChart() {
   container.innerHTML = "";
   const items = DATA.results.nulls;
   const width = 840;
-  const height = 190;
-  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "负控被选中比例" });
-  svgText(svg, 34, 34, "负控偶尔被选中：说明最终模型必须学会不盲目信 source", { fill: "#17201c", "font-size": 17, "font-weight": 800 });
+  const height = 214;
+  const svg = createSvg("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "陷阱选手被误选的比例" });
+  svgText(svg, 34, 32, "陷阱选手偶尔得逞：裁判还不完美的直接证据", { fill: "#17201c", "font-size": 17, "font-weight": 800 });
+  svgText(svg, 34, 54, "陷阱选手 = 拿被打乱的参考数据参赛的方法，理论上不该赢；它每被选中一次，都是裁判的失误。", { fill: "#59645f", "font-size": 13 });
   items.forEach((item, i) => {
-    const y = 72 + i * 48;
+    const y = 84 + i * 48;
     const frac = item.selected / item.cells;
-    const w = 540 * frac / 0.1; // axis capped at 10%
-    svgText(svg, 34, y + 18, item.label, { fill: "#17201c", "font-size": 15, "font-weight": 700 });
-    svg.appendChild(createSvg("rect", { x: 150, y, width: 540, height: 28, fill: "#ece7db", rx: 4 }));
-    svg.appendChild(createSvg("rect", { x: 150, y, width: Math.min(540, w), height: 28, fill: "#c5972f", rx: 4, class: "grow-bar" }));
-    svgText(svg, 710, y + 19, `${item.selected}/${item.cells} cells（${(frac * 100).toFixed(1)}%）`, { fill: "#59645f", "font-size": 13 });
+    const w = 500 * frac / 0.1; // axis capped at 10%
+    svgText(svg, 34, y + 18, NULL_ROW_PLAIN[item.label] || item.label, { fill: "#17201c", "font-size": 14.5, "font-weight": 700 });
+    svg.appendChild(createSvg("rect", { x: 190, y, width: 500, height: 28, fill: "#ece7db", rx: 4 }));
+    svg.appendChild(createSvg("rect", { x: 190, y, width: Math.min(500, w), height: 28, fill: "#c5972f", rx: 4, class: "grow-bar" }));
+    svgText(svg, 706, y + 19, `${item.selected}/${item.cells} 次（${(frac * 100).toFixed(1)}%）`, { fill: "#59645f", "font-size": 13 });
   });
-  svgText(svg, 150, 172, "横轴截至 10%", { fill: "#8a8174", "font-size": 11 });
+  svgText(svg, 190, height - 8, "横轴截至 10%", { fill: "#8a8174", "font-size": 11 });
   container.appendChild(svg);
 }
 
