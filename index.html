@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>目标数据很少时，另一个出行源能不能把城市流向补回来？</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="#problem" class="brand">跨源流向恢复 · NYC + Chicago</a>
+    <nav aria-label="页面导航">
+      <a href="#data">数据</a>
+      <a href="#nyc">纽约验证</a>
+      <a href="#model">模型</a>
+      <a href="#results">结果</a>
+      <a href="#limits">边界</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="problem">
+      <div class="hero-copy reveal">
+        <p class="eyebrow">NYC 已验证 · Chicago 已复现 · PKU GPU 结果</p>
+        <h1>目标数据很少时，另一个出行源能不能把城市流向补回来？</h1>
+        <p class="lead">我们要恢复的不是"某个区域总共有多少人出行"，而是更细的"从哪个区域到哪个区域"。这条路在纽约已经走通一次：0.23% 的目标标签 + 一个神经翻译器，把误差砍掉一半以上；芝加哥的 47 方法基准进一步回答"什么时候该信参考源"。</p>
+        <div class="hero-actions">
+          <a href="#nyc" class="primary-link">看纽约怎么成功的</a>
+          <a href="#results" class="secondary-link">看芝加哥对比结果</a>
+        </div>
+      </div>
+      <div class="hero-visual reveal" aria-label="Chicago OD 流向地图">
+        <div class="source-tabs" data-map-tabs></div>
+        <div id="hero-map" class="map-frame"></div>
+      </div>
+    </section>
+
+    <section class="metric-band" aria-label="核心数字">
+      <div>
+        <span class="metric-value">0.777 → 0.351</span>
+        <span class="metric-label">NYC raw WAPE，-54.8%（bike→taxi，0.23% 标签）</span>
+      </div>
+      <div>
+        <span class="metric-value">78.0%</span>
+        <span class="metric-label">Chicago Taxi/TNC 跨源胜出率（1040 评测格）</span>
+      </div>
+      <div>
+        <span class="metric-value">47</span>
+        <span class="metric-label">同场对比方法数（含 15 个深度网络变体）</span>
+      </div>
+      <div>
+        <span class="metric-value">98.75%</span>
+        <span class="metric-label">走廊重合度 CPC 指标上的胜率（Taxi/TNC）</span>
+      </div>
+    </section>
+
+    <section class="section" id="data">
+      <div class="section-kicker">输入数据长什么样</div>
+      <div class="two-column">
+        <div class="reveal">
+          <h2>不是一张普通表，而是一张城市流向图。</h2>
+          <p>一个 OD 单元就是"起点社区 → 终点社区"。Taxi 和 TNC 的本地文件包含 April 一周的社区 OD 行，地图直接画出 top 跨社区流线——可以看到流量被 Loop/Near North Side（市中心）和 O'Hare（机场）两个极点主导。Divvy 的本地完整 OD parquet 没同步回来，网页只画真实站点覆盖；它的数值结果仍来自 PKU 已完成汇总。</p>
+          <div class="plain-list">
+            <p><strong>目标源：</strong>我们想恢复的出行源，例如 TNC、Divvy，或纽约的 taxi。</p>
+            <p><strong>参考源：</strong>拿来帮忙的另一种出行源，例如 Taxi 或纽约的 Citi Bike。</p>
+            <p><strong>已知信息：</strong>目标源每小时每区进出总量，外加很少的目标 OD 标签，甚至没有标签。</p>
+            <p><strong>要输出：</strong>被隐藏的区到区流向。</p>
+          </div>
+        </div>
+        <div class="data-panel reveal">
+          <div class="panel-title">当前地图层</div>
+          <div id="map-caption" class="map-caption"></div>
+          <div class="data-note">线越粗越亮，April 一周中这条跨社区流向越强；悬停可看单条走廊计数。点越密，Divvy 站点覆盖越集中。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section nyc-band" id="nyc">
+      <div class="section-kicker">纽约：这条路走通过一次</div>
+      <div class="two-column">
+        <div class="reveal">
+          <h2>0.23% 的标签，误差砍掉 54.8%。</h2>
+          <p class="section-lead">NYC bike→taxi：目标侧只保留 2,048 / 900,864 条训练标签（0.23%），用 Citi Bike 作参考源恢复 taxi 需求。三个台阶清楚地区分了"source 有没有用"和"模型会不会用"。</p>
+          <div id="nyc-ladder" class="chart-frame slim"></div>
+          <p class="fine-print">同一数据、同一监督下，旧的复杂架构（SPMF）停在 0.70 左右（512/2048 anchor 均如此）——成功来自更健康的训练范式，不是机制堆叠。凭据见证据表 E-NYC-1 / E-NYC-2。</p>
+        </div>
+        <div class="reveal">
+          <div class="chip-grid" id="nyc-chips"></div>
+          <div class="nyc-note">
+            <h3>为什么这一步重要</h3>
+            <p>它锁定了主张的形态：<strong>target-zero 跨源恢复被信息界卡死，但 target-sparse 可行</strong>。极少量目标标签负责校准"方向、强度、滞后"，参考源提供其余结构。芝加哥基准随后回答同一主张在 OD/走廊粒度上的普遍性。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section muted" id="model">
+      <div class="section-kicker">模型长什么样</div>
+      <h2>两个真实架构：纽约的神经翻译器，芝加哥的残差网络 + 路由。</h2>
+      <p class="section-lead">核心思想一致：<strong>目标先验负责"平常"，网络只学"参考源能解释的残差"，再判断哪一段修正值得信。</strong>下面是按训练配置画出的真实结构，不是示意框图。</p>
+      <div class="arch-tabs" data-arch-tabs>
+        <button class="active" data-arch="nyc">NYC · G113 teacher-first 翻译器</button>
+        <button data-arch="chicago">Chicago · G160 深度基线 + 路由</button>
+      </div>
+      <div id="arch-visual" class="arch-visual" aria-live="polite"></div>
+      <div id="arch-notes" class="arch-notes"></div>
+    </section>
+
+    <section class="section results" id="results">
+      <div class="section-kicker">结果怎么读：优势在哪、边界在哪</div>
+      <div class="results-head">
+        <div class="reveal">
+          <h2>三层证据：总量优势 → 按指标优势 → 谁在赢。</h2>
+          <p>"平均改进"表示：同一批任务单元上，跨源方法族中最好的结果相对只看目标源的方法族中最好的结果平均改善多少。往下两张图把它拆开：优势集中在哪些指标，以及在难任务上是哪一类方法在赢。</p>
+        </div>
+        <div class="chart-tabs" data-chart-tabs>
+          <button class="active" data-chart="overall">总览</button>
+          <button data-chart="direction">方向</button>
+          <button data-chart="split">走廊类型</button>
+          <button data-chart="budget">目标标签</button>
+        </div>
+      </div>
+      <div id="result-chart" class="chart-frame reveal"></div>
+
+      <div class="result-duo">
+        <div class="reveal">
+          <h3>按指标看：优势集中在流量强度与分布形状</h3>
+          <div class="pair-tabs" data-pair-tabs>
+            <button class="active" data-pair="taxi_tnc">Taxi ↔ TNC（同模态）</button>
+            <button data-pair="taxi_divvy">Taxi ↔ Divvy（跨方式）</button>
+          </div>
+          <div id="metric-chart" class="chart-frame slim"></div>
+        </div>
+        <div class="reveal">
+          <h3>谁在赢：任务变难时，深度网络和路由器上位</h3>
+          <p class="chart-note">1040 个评测格里"最佳跨源方法"的类别构成。同模态时简单直接借用就够；跨方式时，深度网络 + 可靠性路由承担主力——这就是深度方法的位置。</p>
+          <div id="mix-chart" class="chart-frame slim"></div>
+        </div>
+      </div>
+
+      <div class="result-notes">
+        <p><strong>Taxi/TNC：</strong>同类道路源，胜出率 77.98%，平均改进 0.2447（95% CI [0.198, 0.295]）。RMSE/CPC/JSD 等强度与形状指标胜率 91%–99%。</p>
+        <p><strong>Taxi/Divvy：</strong>跨出行方式更难，胜出率 60.96%，平均改进 0.1130；高流量走廊（+0.213）明显强于长距离走廊（+0.013）。留出走廊 log MAE 胜率仅 31%，是当前最诚实的短板。</p>
+      </div>
+    </section>
+
+    <section class="section muted" id="limits">
+      <div class="section-kicker">现在还不能夸大的地方</div>
+      <div class="status-grid">
+        <article class="reveal">
+          <h3>已经知道</h3>
+          <p>参考源有真实价值：NYC 单模型 -54.8%，Chicago 两组设置的方法族收益均显著（sign-flip p≈0.0002）。优势集中在高流量走廊与强度/形状指标。</p>
+        </article>
+        <article class="reveal">
+          <h3>还不知道</h3>
+          <p>Chicago 侧仍是方法族比较，固定单一模型尚未锁定；no-harm 率在 Taxi/TNC 上是负项（20%），负控偶尔被选中——"什么时候信 source"必须做进模型。</p>
+        </article>
+        <article class="reveal">
+          <h3>下一步</h3>
+          <p>把 NYC 已验证的 teacher-first 范式和 Chicago 的可靠性路由合并成固定模型：先估计 target-only 能解释多少，再判断 source 骨架可信度，只在可信处修正。</p>
+        </article>
+      </div>
+      <div id="null-chart" class="null-chart reveal"></div>
+    </section>
+
+    <section class="section evidence-section">
+      <div class="section-kicker">证据来源</div>
+      <h2>网页中的结论都绑定到本地文件。</h2>
+      <button id="toggle-evidence" class="secondary-link evidence-button">展开证据表</button>
+      <div id="evidence-list" class="evidence-list" hidden></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>本 briefing 只整理已有实验结果，不新增实验 claim。完整路径见页面证据表。</p>
+  </footer>
+
+  <script src="assets/briefing_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

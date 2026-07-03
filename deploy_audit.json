@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "generated_at": "2026-07-03T05:08:07Z",
+  "site": "/private/tmp/chicago-source-recovery-pages.l2N3LZ",
+  "file_count": 7,
+  "total_bytes": 230778,
+  "errors": [],
+  "warnings": [],
+  "files": [
+    {
+      "path": ".nojekyll",
+      "size_bytes": 0
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 291
+    },
+    {
+      "path": "app.js",
+      "size_bytes": 29047
+    },
+    {
+      "path": "assets/briefing_data.js",
+      "size_bytes": 178829
+    },
+    {
+      "path": "assets/site_manifest.json",
+      "size_bytes": 582
+    },
+    {
+      "path": "index.html",
+      "size_bytes": 10241
+    },
+    {
+      "path": "styles.css",
+      "size_bytes": 11788
+    }
+  ]
+}

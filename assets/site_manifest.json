@@ -1,0 +1,10 @@
+{
+  "title": "目标数据很少时，另一个出行源能不能把城市流向补回来？",
+  "generated_at": "2026-07-03T12:11:11",
+  "source_artifacts": {
+    "taxiTncSummary": "docs/reports/t43g160_chicago_corridor_router_20260703/summary_taxi_tnc.json",
+    "taxiDivvySummary": "docs/reports/t43g160_chicago_corridor_router_20260703/taxi_divvy_full/summary_taxi_divvy.json",
+    "checkpoint": "docs/reports/t43g160_chicago_corridor_router_20260703/g160_execution_checkpoint_20260703.md"
+  },
+  "entry": ".report_outputs/20260703_chicago_source_recovery_briefing/index.html"
+}
